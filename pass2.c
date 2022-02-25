@@ -1,65 +1,106 @@
 #include<stdio.h>
+#include<stdlib.h>
 #include<string.h>
-void main()
-{
-	FILE *fin,*ftab,*flen,*fsym,*fout;
-	int i,j=0,len;
-	char adr[10],symadr[10],op[10],start[10],temp[30],line[20],label[20],opc[10],operand[10],symtab[10],opmne[10];
-	fin=fopen("object.txt","r");
-	flen=fopen("length.txt","r");
-	ftab=fopen("optab.txt","r");
-	fsym=fopen("symboltable.txt","r");
-	fout=fopen("output.txt","w");
-	fscanf(fin,"%s\t%s\t%s\t%s",adr,label,opc,operand);
-	if(strcmp(opc,"START")==0){
-		strcpy(start,operand);
-		fscanf(flen,"%d",&len);
-	}
-	printf("H^%s^%s^%d\nT^00%s^",label,start,len,start);
-	fprintf(fout,"H^%s^%s^%d\nT^00%s^",label,start,len,start);
-	fscanf(fin,"%s\t%s\t%s\t%s",adr,label,opc,operand);
-	while(strcmp(opc,"END")!=0){
-		while(!feof(ftab)){
-			fscanf(ftab,"%s\t%s",opmne,op);
-			if(strcmp(opc,opmne)==0){
-				fclose(ftab);
-				while(!feof(fsym)){
-					fscanf(fsym,"%s\t%s",symadr,symtab);
-					if(strcmp(operand,symtab)==0){
-						printf("%s%s^",op,symadr);
-						fprintf(fout,"%s%s^",op,symadr);
-						break;
-					}
-				}
-				break;
-			}
-		}
-		if((strcmp(opc,"BYTE")==0)||(strcmp(opc,"WORD")==0)){
-			if(strcmp(opc,"WORD")==0){
-				printf("0000%s^",operand);
-				fprintf(fout,"0000%s^",operand);
-			}
-			else{
-				len=strlen(operand);
-				for(i=2;i<len;i++){
-					printf("%d",operand[i]);
-					fprintf(fout,"%d",operand[i]);
-				}
-				printf("^");
-				fprintf(fout,"^");
-			}
-		}
-		fscanf(fin,"%s\t%s\t%s\t%s",adr,label,opc,operand);
-		ftab=fopen("optab.txt","r");
-		fseek(ftab,SEEK_SET,0);
-	}
-	printf("\nE^00%s\n\n",start);
-	fprintf(fout,"\nE^00%s\n\n",start);
-	fclose(fin);
-	fclose(ftab);
-	fclose(fsym);
-	fclose(flen);
-	fclose(fout);
+
+void main(){
+
+        FILE *output,*interFile,*lenFile,*optab,*symtab;
+        
+        char address[10],label[10],opcode[10],operand[10],len[5],mnemonic[10],mnemonic_val[5],symbol[10],symbol_val[10];
+        int opcode_found,counter=0,ignore=0,constant=0,sym_found;
+       
+        interFile=fopen("intermediate.txt","r");
+       
+        lenFile=fopen("length.txt","r");
+        fscanf(interFile,"%s\t%s\t%s\t%s",address,label,opcode,operand);
+        fscanf(lenFile,"%s",len);
+        
+        if(strcmp(opcode,"START")==0){
+          
+            printf("H^%s^%s^%s",label,operand,len);
+            fscanf(interFile,"%s\t%s\t%s\t%s",address,label,opcode,operand);
+        }
+
+        while (!feof(interFile))
+        {
+                if(strcmp(opcode,"END")==0){
+                
+                    printf("\nE^%.6d",atoi(operand));
+                    
+                    exit(1);
+                }
+                optab=fopen("optab.txt","r");
+                opcode_found=0;
+                while(!feof(optab)){
+
+                        fscanf(optab,"%s\t%s",mnemonic,mnemonic_val);
+                        if(strcmp(mnemonic,opcode)==0){
+                            opcode_found=1;
+                            break;
+                        }
+                        
+                }
+                fclose(optab);
+                if(opcode_found==0){
+                        ignore=0;
+                        constant=0;
+                        if(strcmp(opcode,"WORD")==0 || strcmp(opcode,"BYTE")==0){
+                            strcpy(mnemonic_val,operand);
+                            opcode_found=1;
+                            constant=1;
+                            counter++;
+                            
+                        }else if(strcmp(opcode,"RESB")==0 || strcmp(opcode,"RESW")==0){
+                            ignore=1;
+                        }else{
+                            printf("invalid opcode found!!");
+                            exit(1);
+                        }
+                        
+                }
+                if(ignore==0){
+                    if(constant==0){
+                        symtab=fopen("symtab.txt","r");
+                        sym_found=0;
+                        while(!feof(symtab)){
+                                fscanf(symtab,"%s\t%s",symbol,symbol_val);
+                                if(strcmp(operand,symbol)==0){
+                                    strcat(mnemonic_val,symbol_val);
+                                    sym_found=1;
+                                    counter++;
+                                    
+                                    break;
+                                }
+                        }
+                        if(sym_found==0){
+                            printf("invalid symbol found: %s",operand);
+                            exit(1);
+                        }
+                        fclose(symtab);
+                    }
+                    if(counter>10)
+                        counter=1;
+                    if(counter==1){
+                      
+                        printf("\nT^%s^1E",address);
+                    }
+                   
+                    printf("^%s",mnemonic_val);
+                }
+                fscanf(interFile,"%s\t%s\t%s\t%s",address,label,opcode,operand);
+
+                if(strcmp(opcode,"END")==0){
+                    
+                    printf("\nE^%s",operand);
+                    
+                    exit(1);
+                }
+
+        }
+        fclose(interFile);
+        fclose(output);
+        fclose(symtab);
+        fclose(optab);
+        fclose(lenFile);
+
 }
-
-

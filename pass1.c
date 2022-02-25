@@ -1,79 +1,117 @@
 #include<stdio.h>
-#include<string.h>
 #include<stdlib.h>
-void main() {
+#include<string.h>
 
-	int loc, start, len, found, found1;
-    	char opc[10], opr[10], lb[10], temp[10], mne[10],symlb[20],symadr[20];
-    	FILE *fprg, *fout, *fopt, *fsym, *flen, *frsym;
+void main(){
+	
+	FILE *optab,*symtab,*symtabread,*interFile,*prgrmFile,*lenFile,*tempFile;
+	remove("symtab.txt");
+	
+	symtab=fopen("symtab.txt","a");
+	
+	interFile=fopen("intermediate.txt","w");
+	prgrmFile=fopen("program.txt","r");
+	lenFile=fopen("length.txt","w");
+	
+	char label[10],opcode[10],operand[10],symbol[10],mnemonic[10],temp[10];
+	int locctr,start,found_opcode,symflag;
+    
 
-    	fprg = fopen("program.txt", "r");
-	fout = fopen("object.txt", "w");
-    	fopt = fopen("optab.txt", "r");
-    	fsym = fopen("symboltable.txt", "w+");
-	flen = fopen("length.txt", "w");
-	fscanf(fprg, "%s\t%s\t%s", lb, opc, opr);
-	if(strcmp(opc, "START")==0) {
-		start = atoi(opr);
-		loc = start;
-		fprintf(fout, "%s\t%s\t%s\n", lb, opc, opr);
-		fscanf(fprg, "%s\t%s\t%s", lb, opc, opr);
+	fscanf(prgrmFile,"%s\t%s\t%s",label,opcode,operand);
+	
+	if(strcmp(opcode,"START")==0){
+		
+		
+		tempFile=fopen("tempFile.txt","w");
+		fprintf(tempFile,"%s",operand);
+		
+		fclose(tempFile);
+		tempFile=fopen("tempFile.txt","r");
+		fscanf(tempFile,"%x",&locctr);
+		fclose(tempFile);
+		start=locctr;
+       
+		
+		fprintf(interFile,"**\t%s\t%s\t%s\n",label,opcode,operand);
+		fscanf(prgrmFile,"%s\t%s\t%s",label,opcode,operand);
+	}else{
+		locctr=0x0;
+		start=0x0;
 	}
-	else {
-		loc = 0;
-	}
-	while(strcmp(opc, "END")!=0) {
-		fprintf(fout, "%d\t", loc);
-		printf("%s\t%s\t%s\n", lb, opc, opr);
-		if(strcmp(lb, "-")!=0) {
-			fprintf(fsym, "%s\t%d\n", lb, loc);
-		}else{
-			fseek(fsym,SEEK_SET,0);
-			fscanf(fsym, "%s\t%s",symlb, symadr);
-			while(!feof(fsym)){
-				printf("%s \t %s \n",symlb,symadr);
-				if(strcmp(symlb,lb)==0){
-					printf("Label duplication error");
-					exit(0);
-				}
-				fscanf(fsym,"%s\t%s",symlb,symadr);
+	
+	while(!feof(prgrmFile)){
+		printf("\t%x\n",locctr);
+		if(strcmp(opcode,"END")!=0)
+			fprintf(interFile,"%x\t",locctr);
+		else
+			fprintf(interFile,"**\t**");	
+		symflag=0;
+		if(strcmp(label,"-")!=0){
+			symflag=1;
+			
+			fclose(symtab);
+			symtabread=fopen("symtab.txt","r");
+			while(!feof(symtabread)){
+				
+				fscanf(symtabread,"%s\t%s",symbol,temp);
+				
+				if(strcmp(symbol,label)==0){
+					printf("error :duplicate symnbol found ; %s",symbol);
+					exit(1);
+				}			
 			}
-			fscanf(fopt, "%s\t%s", temp, mne);
-			found = 0;
-			while(strcmp(temp, "END")!=0) {
-				if(strcmp(opc, temp)==0) {
-					found = 1;
-					loc+=3;
-					break;
-				}
-				fscanf(fopt, "%s\t%s", temp, mne);
+			symtab=fopen("symtab.txt","a");
+		}
+		if(symflag==1)
+			fprintf(symtab,"%s\t%x\n",label,locctr);
+		
+		found_opcode=0;
+        optab=fopen("optab.txt","r");
+		while(!feof(optab)){
+            
+			fscanf(optab,"%s",mnemonic);
+			
+			if(strcmp(mnemonic,opcode)==0){
+				found_opcode=1;
+				locctr+=0x3;
+				break;			
 			}
-			if(strcmp(opc, "WORD")==0) {
-				loc+=3;
-			}
-			else if(strcmp(opc, "RESW")==0) {
-				loc+=(3*(atoi(opr)));
-			}
-			else if(strcmp(opc, "RESB")==0) {
-				loc+=(atoi(opr));
-			}
-			else if(strcmp(opc, "BYTE")==0) {
-				loc++;
-			}
-			else if(found==0){
-				printf("Undefined Opcode");
-			}
+            
 				
 		}
-		fscanf(fprg, "%s\t%s\t%s", lb, opc, opr);
+        fclose(optab);
+		if(found_opcode==0 && strcmp(opcode,"END")!=0){
+			
+			if(strcmp(opcode,"BYTE")==0)
+				locctr+=0x1;
+			else if(strcmp(opcode,"RESB")==0)
+				locctr+=atoi(operand);
+			else if(strcmp(opcode,"WORD")==0)
+				locctr+=0x3;
+			else if(strcmp(opcode,"RESW")==0)
+				locctr+=(atoi(operand)*0x3);
+			else{
+				printf("invalid opcode found : %s",opcode);
+				exit(1);			
+			}
+			
+		}
+		else if(strcmp(opcode,"END")==0){
+			fprintf(interFile,"\t%s\t%s",opcode,operand);
+			printf("%x",locctr);
+			fprintf(lenFile,"%x",locctr-start);
+			exit(0);
+					
+		}
+		
+		fprintf(interFile,"%s\t%s\t%s\n",label,opcode,operand);
+		fscanf(prgrmFile,"%s\t%s\t%s",label,opcode,operand);
+		
+
 	}
-	fprintf(fout, "%d\t%s\t%s\t%s\n", loc, lb, opc, opr);
-	len = loc-start;
-	printf("The length of the program: %d\n", len);
-	fprintf(flen,"%d",len);
-	fclose(flen);
-	fclose(fprg);
-	fclose(fout);
-	fclose(fopt);
-	fclose(fsym);
-}	
+	fclose(interFile);
+	fclose(prgrmFile);
+	fclose(symtab);
+	fclose(symtabread);
+	fclose(optab);
+}
